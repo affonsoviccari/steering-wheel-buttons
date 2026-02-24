@@ -1,10 +1,8 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import QPoint, QSize, QSettings, pyqtSlot
-from PyQt5.QtGui import QIcon, QPixmap
+from PyQt5.QtGui import QIcon, QPixmap, QKeyEvent
 from PyQt5 import uic
 import sys, pathlib
-import keyboard
-from keyboard import KeyboardEvent
 from utils.bind import *
 
 WHEEL_BUTTON_FIXED_HEIGHT = 70
@@ -31,16 +29,15 @@ class BindDialog(QDialog):
         self.absPath = ABS_PATH
         self.ui = uic.loadUi(self.absPath/'gui/bindDialog.ui', self)
 
-        # Keyboard Eventcallback
-        keyboard.on_press(self.keyboard_event_callback)
-
         self.settings = settings
         self.id = id
+
+        self.pressedKeys = set()
 
         useDefault = self.settings.value("/bind/use-default", True)
         self.ui.checkBoxKey.setChecked(useDefault)
         if useDefault:
-            self.ui.lineEditKey.setEnabled(False)
+            self.ui.lineEditKey.setEnabled(not useDefault)
             self.ui.lineEditKey.setText(f"DEFAULT-PARAMETER-ID-{self.id}")
         self.ui.checkBoxKey.stateChanged.connect(self.use_bind_default_value_changed)
         
@@ -48,11 +45,18 @@ class BindDialog(QDialog):
     def use_bind_default_value_changed(self, value: int):
         self.ui.checkBoxKey.setChecked(value)
         self.settings.setValue("/bind/use-default", value)
-        if value is True:
+        if value:
             self.ui.lineEditKey.setText(f"DEFAULT-PARAMETER-ID-{self.id}")
+        self.ui.lineEditKey.setEnabled(not value)
 
-    def keyboard_event_callback(self, event:KeyboardEvent):
-        print(event.name)
+    def keyPressEvent(self, event:QKeyEvent):
+        self.pressedKeys.add(event.key())
+        self.ui.lineEditKey.setText("+".join(self.pressedKeys))
+        return super().keyPressEvent(event)
+    
+    def keyReleaseEvent(self, event:QKeyEvent):
+        self.pressedKeys.remove(event.key())
+        return super().keyReleaseEvent(event)
 
 class WheelButton(QPushButton):
     def __init__(self, settings:QSettings, id:str, label:QLabel, xpos:int, ypos:int, height:int, width: int, offsetX:int, offsetY:int):
